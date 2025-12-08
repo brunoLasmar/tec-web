@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import UserLayout from '@/app/components/UserLayout';
 import Button from '@/app/components/button';
 
 const API_BASE = 'http://localhost:3333';
@@ -14,7 +13,8 @@ interface Game {
   preco_cartela: any;
   sala_nome?: string;
   status?: string;
-  SALA?: { nome: string }; // Caso venha do include do Prisma
+  SALA?: { nome: string };
+  _count?: { CARTELA: number };
 }
 
 interface Room {
@@ -25,12 +25,12 @@ interface Room {
 export default function GamesAdminPage() {
   const router = useRouter();
   
-  // --- ESTADOS ---
+  // --- Estados ---
   const [games, setGames] = useState<Game[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Estados do Formulário (Modal)
+  // --- Modal ---
   const [showForm, setShowForm] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [formData, setFormData] = useState({
@@ -43,34 +43,33 @@ export default function GamesAdminPage() {
     fetchData();
   }, []);
 
-  // --- CARREGAMENTO DE DADOS (COM CORREÇÃO DE CACHE) ---
   const fetchData = async () => {
     const token = localStorage.getItem('bingoToken');
-    if (!token) return router.push('/login');
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
 
     setLoading(true);
     try {
-      // 1. Busca Jogos
-      const gamesRes = await fetch(`${API_BASE}/games`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-        cache: 'no-store' // <--- OBRIGATÓRIO: Ignora cache antigo
-      });
-
-      // 2. Busca Salas (para o select)
+      // Busca Salas
       const roomsRes = await fetch(`${API_BASE}/rooms`, {
         headers: { 'Authorization': `Bearer ${token}` },
         cache: 'no-store'
       });
+      if (roomsRes.ok) setRooms(await roomsRes.json());
 
-      if (gamesRes.ok && roomsRes.ok) {
+      // Busca Jogos
+      const gamesRes = await fetch(`${API_BASE}/games`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        cache: 'no-store'
+      });
+
+      if (gamesRes.ok) {
         const gamesData = await gamesRes.json();
-        const roomsData = await roomsRes.json();
-        
         setGames(gamesData);
-        setRooms(roomsData);
-        console.log("Dados atualizados:", gamesData);
       } else {
-        console.error("Erro ao buscar dados. Status:", gamesRes.status);
+        console.error("Erro ao buscar jogos:", gamesRes.status);
       }
     } catch (error) {
       console.error("Erro de conexão:", error);
@@ -78,8 +77,6 @@ export default function GamesAdminPage() {
       setLoading(false);
     }
   };
-
-  // --- MANIPULADORES DE AÇÃO ---
 
   const handleDelete = async (id: number) => {
     if (!confirm('Tem certeza que deseja excluir este jogo?')) return;
@@ -96,7 +93,7 @@ export default function GamesAdminPage() {
         fetchData();
       } else {
         const err = await res.json();
-        alert(`Erro ao excluir: ${err.message}`);
+        alert(`Erro: ${err.message}`);
       }
     } catch (e) { alert('Erro de rede.'); }
   };
@@ -115,8 +112,6 @@ export default function GamesAdminPage() {
     } catch (e) { alert('Erro de conexão.'); }
   };
 
-  // --- LÓGICA DO FORMULÁRIO (CRIAR / EDITAR) ---
-
   const openCreateModal = () => {
     setEditingGame(null);
     setFormData({ id_sala: '', data_hora: '', preco_cartela: '' });
@@ -125,9 +120,7 @@ export default function GamesAdminPage() {
 
   const openEditModal = (game: Game) => {
     setEditingGame(game);
-    // Formata a data para o input datetime-local (YYYY-MM-DDTHH:mm)
     const dateObj = new Date(game.data_hora);
-    // Ajuste simples de fuso horário para exibir no input
     const offset = dateObj.getTimezoneOffset() * 60000;
     const localIso = new Date(dateObj.getTime() - offset).toISOString().slice(0, 16);
 
@@ -174,89 +167,130 @@ export default function GamesAdminPage() {
     } catch (e) { alert('Erro de conexão ao salvar.'); }
   };
 
-  // --- RENDERIZAÇÃO ---
-
-  if (loading) return (
-    <UserLayout>
-        <div style={{ textAlign: 'center', padding: '50px', color: 'white' }}>Carregando sistema...</div>
-    </UserLayout>
-  );
+  if (loading) return <div style={{padding: '20px', color: 'white'}}>Carregando sistema...</div>;
 
   return (
-    <UserLayout>
-      <div className="page-container">
-        
-        {/* CABEÇALHO */}
-        <div className="header-actions">
-            <Button variant="secondary" onClick={() => router.push('/rooms')}>← Salas</Button>
-            <h1 className="page-title">Gerenciar Jogos</h1>
-            <Button variant="primary" onClick={() => router.push('/admin')} style={{ backgroundColor: '#a855f7' }}>Painel Admin →</Button>
+    <div className="page-container">
+      {/* HEADER IGUAL AO ADMIN/ROOMS */}
+      <header>
+        <nav className="navbar">
+            <div className="navbar-content" style={{ width: "100%" }}>
+                <img src="/bingo-logo.png" alt="logo" className="navbar-logo" />
+                <div className="navbar-links">
+                    <a className="nav-links">Gerenciar Jogos</a>
+                </div>
+                <div style={{ marginLeft: "auto", paddingRight: "40px", display: 'flex', gap: '10px' }}>
+                    <Button variant="primary" onClick={() => router.push('/admin')}>
+                        Voltar ao Painel
+                    </Button>
+                    <Button variant="primary" onClick={() => {
+                        localStorage.removeItem('bingoToken');
+                        window.location.href = '/login';
+                    }}>
+                        Sair
+                    </Button>
+                </div>
+            </div>
+        </nav>
+      </header>
+
+      <main style={{ padding: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h1 className="title">Lista de Jogos</h1>
+            <Button onClick={openCreateModal} style={{ backgroundColor: '#22c55e' }}>
+                + Novo Jogo
+            </Button>
         </div>
 
-        <div className="main-content">
-            {/* BOTÃO NOVO JOGO */}
-            <div style={{ marginBottom: '20px', textAlign: 'right' }}>
-                <Button onClick={openCreateModal} style={{ backgroundColor: '#22c55e' }}>
-                    + Novo Jogo
-                </Button>
-            </div>
-
-            {/* TABELA DE JOGOS */}
-            <div className="table-card">
-                <table className="custom-table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Sala</th>
-                            <th>Data / Hora</th>
-                            <th>Preço</th>
-                            <th>Status</th>
-                            <th className="text-center">Ações</th>
+        {/* TABELA DE JOGOS */}
+        <div style={{ backgroundColor: '#1a3d0f', borderRadius: '12px', padding: '20px', boxShadow: '0 8px 25px rgba(0,0,0,0.5)', overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white' }}>
+                <thead>
+                    <tr style={{ borderBottom: '2px solid #4a752c', textAlign: 'left' }}>
+                        <th style={{ padding: '12px' }}>ID</th>
+                        <th style={{ padding: '12px' }}>Sala</th>
+                        <th style={{ padding: '12px' }}>Data / Hora</th>
+                        <th style={{ padding: '12px' }}>Preço</th>
+                        <th style={{ padding: '12px' }}>Status</th>
+                        <th style={{ padding: '12px', textAlign: 'center' }}>Vendas</th>
+                        <th style={{ padding: '12px', textAlign: 'center' }}>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {games.map(game => (
+                        <tr key={game.id_jogo} style={{ borderBottom: '1px solid #2d7a2d' }}>
+                            <td style={{ padding: '12px' }}>#{game.id_jogo}</td>
+                            <td style={{ padding: '12px', fontWeight: 'bold', color: '#90ee90' }}>
+                                {game.SALA?.nome || rooms.find(r => r.id_sala === game.id_sala)?.nome || `Sala ${game.id_sala}`}
+                            </td>
+                            <td style={{ padding: '12px' }}>{new Date(game.data_hora).toLocaleString()}</td>
+                            <td style={{ padding: '12px' }}>R$ {Number(game.preco_cartela).toFixed(2)}</td>
+                            <td style={{ padding: '12px' }}>
+                                <span style={{ 
+                                    padding: '4px 8px', 
+                                    borderRadius: '4px', 
+                                    backgroundColor: game.status === 'AGUARDANDO' ? '#eab308' : '#22c55e',
+                                    color: 'black',
+                                    fontWeight: 'bold',
+                                    fontSize: '0.8rem'
+                                }}>
+                                    {game.status || 'Ativo'}
+                                </span>
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>{game._count?.CARTELA || 0}</td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                    <button 
+                                        onClick={() => handleStartGame(game.id_jogo)}
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                                        title="Iniciar"
+                                    >▶️</button>
+                                    <button 
+                                        onClick={() => openEditModal(game)}
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                                        title="Editar"
+                                    >✏️</button>
+                                    <button 
+                                        onClick={() => handleDelete(game.id_jogo)}
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                                        title="Excluir"
+                                    >🗑️</button>
+                                </div>
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        {games.map(game => (
-                            <tr key={game.id_jogo}>
-                                <td>#{game.id_jogo}</td>
-                                <td style={{ fontWeight: 'bold', color: '#bfdbfe' }}>
-                                    {game.SALA?.nome || rooms.find(r => r.id_sala === game.id_sala)?.nome || `Sala ${game.id_sala}`}
-                                </td>
-                                <td>{new Date(game.data_hora).toLocaleString()}</td>
-                                <td style={{ color: '#4ade80', fontFamily: 'monospace', fontSize: '1.1em' }}>
-                                    R$ {Number(game.preco_cartela).toFixed(2)}
-                                </td>
-                                <td>
-                                    <span className={`badge ${game.status === 'AGUARDANDO' ? 'pending' : 'active'}`}>
-                                        {game.status || 'Ativo'}
-                                    </span>
-                                </td>
-                                <td className="actions-cell">
-                                    <button onClick={() => handleStartGame(game.id_jogo)} className="action-btn start" title="Iniciar Sorteio">▶️</button>
-                                    <button onClick={() => openEditModal(game)} className="action-btn edit" title="Editar">✏️</button>
-                                    <button onClick={() => handleDelete(game.id_jogo)} className="action-btn delete" title="Excluir">🗑️</button>
-                                </td>
-                            </tr>
-                        ))}
-                        {games.length === 0 && (
-                            <tr><td colSpan={6} className="empty-msg">Nenhum jogo cadastrado.</td></tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                    ))}
+                    {games.length === 0 && (
+                        <tr>
+                            <td colSpan={7} style={{ padding: '20px', textAlign: 'center', color: '#ccc' }}>
+                                Nenhum jogo cadastrado.
+                            </td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
         </div>
 
-        {/* MODAL DE CRIAÇÃO / EDIÇÃO */}
+        {/* MODAL */}
         {showForm && (
-            <div className="modal-overlay">
-                <div className="modal-content">
-                    <h2>{editingGame ? 'Editar Jogo' : 'Criar Novo Jogo'}</h2>
+            <div style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+            }}>
+                <div style={{
+                    backgroundColor: '#2d5016', padding: '30px', borderRadius: '12px', width: '90%', maxWidth: '500px',
+                    border: '2px solid #4a752c', boxShadow: '0 8px 25px rgba(0,0,0,0.5)'
+                }}>
+                    <h2 style={{ color: 'white', marginBottom: '20px', textAlign: 'center' }}>
+                        {editingGame ? 'Editar Jogo' : 'Criar Novo Jogo'}
+                    </h2>
                     <form onSubmit={handleSubmit}>
-                        <div className="form-group">
-                            <label>Sala Vinculada</label>
+                        <div style={{ marginBottom: '15px' }}>
+                            <label style={{ color: 'white', display: 'block', marginBottom: '5px' }}>Sala Vinculada</label>
                             <select 
                                 value={formData.id_sala} 
                                 onChange={e => setFormData({...formData, id_sala: e.target.value})}
                                 required
+                                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: 'none' }}
                             >
                                 <option value="">Selecione uma sala...</option>
                                 {rooms.map(r => (
@@ -265,91 +299,37 @@ export default function GamesAdminPage() {
                             </select>
                         </div>
 
-                        <div className="form-group">
-                            <label>Data e Hora de Início</label>
+                        <div style={{ marginBottom: '15px' }}>
+                            <label style={{ color: 'white', display: 'block', marginBottom: '5px' }}>Data e Hora</label>
                             <input 
                                 type="datetime-local" 
                                 value={formData.data_hora} 
                                 onChange={e => setFormData({...formData, data_hora: e.target.value})}
                                 required
+                                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: 'none' }}
                             />
                         </div>
 
-                        <div className="form-group">
-                            <label>Preço da Cartela (R$)</label>
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ color: 'white', display: 'block', marginBottom: '5px' }}>Preço (R$)</label>
                             <input 
-                                type="number" step="0.01" min="0" placeholder="0.00"
+                                type="number" step="0.01" min="0"
                                 value={formData.preco_cartela} 
                                 onChange={e => setFormData({...formData, preco_cartela: e.target.value})}
                                 required
+                                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: 'none' }}
                             />
                         </div>
 
-                        <div className="modal-actions">
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                             <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
-                            <Button type="submit">{editingGame ? 'Salvar Alterações' : 'Criar Jogo'}</Button>
+                            <Button type="submit">{editingGame ? 'Salvar' : 'Criar'}</Button>
                         </div>
                     </form>
                 </div>
             </div>
         )}
-
-        {/* ESTILOS CSS (Glassmorphism) */}
-        <style jsx>{`
-            .page-container { padding: 2rem; max-width: 1200px; margin: 0 auto; color: white; font-family: sans-serif; }
-            .header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
-            .page-title { font-size: 2rem; margin: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-            
-            .table-card {
-                background: rgba(30, 41, 59, 0.75);
-                backdrop-filter: blur(12px);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 16px;
-                padding: 1.5rem;
-                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-                overflow-x: auto;
-            }
-
-            .custom-table { width: 100%; border-collapse: collapse; }
-            .custom-table th { text-align: left; padding: 1rem; background: rgba(0,0,0,0.4); color: #94a3b8; text-transform: uppercase; font-size: 0.8rem; }
-            .custom-table td { padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); color: #e2e8f0; vertical-align: middle; }
-            .custom-table tr:hover { background: rgba(255,255,255,0.05); }
-            .text-center { text-align: center; }
-            .empty-msg { text-align: center; padding: 3rem; color: #64748b; font-style: italic; }
-
-            .badge { padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
-            .badge.pending { background: rgba(253, 224, 71, 0.2); color: #fde047; border: 1px solid rgba(253, 224, 71, 0.3); }
-            .badge.active { background: rgba(74, 222, 128, 0.2); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.3); }
-
-            .actions-cell { display: flex; gap: 10px; justify-content: center; }
-            .action-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; transition: transform 0.2s; }
-            .action-btn:hover { transform: scale(1.2); }
-
-            /* MODAL STYLES */
-            .modal-overlay {
-                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                background: rgba(0,0,0,0.7); backdrop-filter: blur(5px);
-                display: flex; justify-content: center; align-items: center; z-index: 1000;
-            }
-            .modal-content {
-                background: #1e293b; border: 1px solid #334155;
-                padding: 2rem; border-radius: 16px; width: 100%; max-width: 500px;
-                box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            }
-            .modal-content h2 { margin-top: 0; margin-bottom: 1.5rem; color: white; text-align: center; }
-            
-            .form-group { margin-bottom: 1.5rem; }
-            .form-group label { display: block; margin-bottom: 0.5rem; color: #cbd5e1; font-weight: 600; font-size: 0.9rem; }
-            .form-group input, .form-group select {
-                width: 100%; padding: 0.75rem; border-radius: 8px;
-                border: 1px solid #475569; background: #0f172a; color: white;
-                font-size: 1rem; outline: none;
-            }
-            .form-group input:focus, .form-group select:focus { border-color: #a855f7; box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2); }
-            
-            .modal-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem; }
-        `}</style>
-      </div>
-    </UserLayout>
+      </main>
+    </div>
   );
 }
