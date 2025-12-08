@@ -25,16 +25,19 @@ model CARTELA {
 }
 
 model JOGO {
-  id_jogo             Int                 @id @default(autoincrement())
-  data_hora           DateTime            @db.DateTime(0)
-  id_sala             Int
-  id_usuario_vencedor Int?
-  preco_cartela       Decimal             @db.Decimal(10, 2)
-  CARTELA             CARTELA[]
-  SALA                SALA                @relation(fields: [id_sala], references: [id_sala], onDelete: Cascade)
-  USUARIO             USUARIO?            @relation(fields: [id_usuario_vencedor], references: [id_usuario], onDelete: SetNull)
-  NUMEROS_SORTEADOS   NUMEROS_SORTEADOS[]
-  PREMIOS             PREMIOS[]
+  id_jogo           Int                 @id @default(autoincrement())
+  data_hora         DateTime            @db.DateTime(0)
+  id_sala           Int
+  preco_cartela     Decimal             @db.Decimal(10, 2)
+  status            String              @default("AGUARDANDO") @db.VarChar(20) // Novo campo
+  
+  // Relacionamentos
+  CARTELA           CARTELA[]
+  SALA              SALA                @relation(fields: [id_sala], references: [id_sala], onDelete: Cascade)
+  NUMEROS_SORTEADOS NUMEROS_SORTEADOS[]
+  PREMIOS           PREMIOS[]
+
+  // id_usuario_vencedor e relação USUARIO foram removidos aqui
 
   @@map("JOGO")
 }
@@ -86,8 +89,8 @@ model USUARIO {
   senha       String    @db.VarChar(255)
   creditos    Decimal   @db.Decimal(10, 2)
   is_admin    Boolean   @default(false) @db.TinyInt
+  
   CARTELA     CARTELA[]
-  JOGO        JOGO[]
   PREMIOS     PREMIOS[]
 
   @@map("USUARIO")

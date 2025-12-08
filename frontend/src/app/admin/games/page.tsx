@@ -12,9 +12,10 @@ interface Game {
   data_hora: string;
   preco_cartela: any;
   sala_nome?: string;
-  status?: string;
+  // Status agora pode vir do banco ou ser calculado
+  status?: 'AGUARDANDO' | 'ATIVO' | 'FINALIZADO'; 
   SALA?: { nome: string };
-  _count?: { CARTELA: number };
+  // _count removido pois não vamos usar vendas por enquanto
 }
 
 interface Room {
@@ -25,12 +26,10 @@ interface Room {
 export default function GamesAdminPage() {
   const router = useRouter();
   
-  // --- Estados ---
   const [games, setGames] = useState<Game[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // --- Modal ---
   const [showForm, setShowForm] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [formData, setFormData] = useState({
@@ -67,6 +66,7 @@ export default function GamesAdminPage() {
 
       if (gamesRes.ok) {
         const gamesData = await gamesRes.json();
+        // Opcional: Processar status aqui se o backend não mandar
         setGames(gamesData);
       } else {
         console.error("Erro ao buscar jogos:", gamesRes.status);
@@ -76,6 +76,20 @@ export default function GamesAdminPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // --- Funções Auxiliares ---
+
+  const getGameStatus = (game: Game): string => {
+      // 1. Se o backend já mandar o status oficial, usa ele
+      if (game.status) return game.status;
+
+      // 2. Fallback: Lógica baseada em tempo (Provisório até você atualizar o banco)
+      const gameDate = new Date(game.data_hora);
+      const now = new Date();
+      // Se já passou da hora e não tem status definido, assume ATIVO ou FINALIZADO
+      if (now >= gameDate) return 'ATIVO'; 
+      return 'AGUARDANDO';
   };
 
   const handleDelete = async (id: number) => {
@@ -107,11 +121,35 @@ export default function GamesAdminPage() {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (res.ok) alert('Sorteio iniciado! ⚡');
-        else alert('Erro ao iniciar sorteio.');
+        if (res.ok) {
+            alert('Sorteio iniciado! ⚡');
+            fetchData(); // Atualiza para mudar status se o back suportar
+        } else {
+            alert('Erro ao iniciar sorteio.');
+        }
     } catch (e) { alert('Erro de conexão.'); }
   };
 
+  const handleStopGame = async (id: number) => {
+    const token = localStorage.getItem('bingoToken');
+    if (!confirm('Deseja forçar o FIM deste jogo? Ninguém mais poderá jogar.')) return;
+
+    try {
+        // Você precisará criar essa rota no backend: @Post(':id/stop')
+        const res = await fetch(`${API_BASE}/games/${id}/stop`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+            alert('Jogo finalizado manualmente.');
+            fetchData();
+        } else {
+            alert('Erro ao finalizar jogo.');
+        }
+    } catch (e) { alert('Erro de conexão.'); }
+  };
+
+  // ... (Funções de Modal mantidas iguais: openCreateModal, openEditModal, handleSubmit) ...
   const openCreateModal = () => {
     setEditingGame(null);
     setFormData({ id_sala: '', data_hora: '', preco_cartela: '' });
@@ -135,20 +173,13 @@ export default function GamesAdminPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem('bingoToken');
-    
-    const url = editingGame 
-      ? `${API_BASE}/games/${editingGame.id_jogo}` 
-      : `${API_BASE}/games`;
-    
+    const url = editingGame ? `${API_BASE}/games/${editingGame.id_jogo}` : `${API_BASE}/games`;
     const method = editingGame ? 'PATCH' : 'POST';
 
     try {
       const res = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
           id_sala: parseInt(formData.id_sala),
           data_hora: new Date(formData.data_hora).toISOString(),
@@ -167,11 +198,10 @@ export default function GamesAdminPage() {
     } catch (e) { alert('Erro de conexão ao salvar.'); }
   };
 
-  if (loading) return <div style={{padding: '20px', color: 'white'}}>Carregando sistema...</div>;
+  if (loading) return <div style={{padding:'20px', color:'white'}}>Carregando...</div>;
 
   return (
     <div className="page-container">
-      {/* HEADER IGUAL AO ADMIN/ROOMS */}
       <header>
         <nav className="navbar">
             <div className="navbar-content" style={{ width: "100%" }}>
@@ -212,56 +242,73 @@ export default function GamesAdminPage() {
                         <th style={{ padding: '12px' }}>Data / Hora</th>
                         <th style={{ padding: '12px' }}>Preço</th>
                         <th style={{ padding: '12px' }}>Status</th>
-                        <th style={{ padding: '12px', textAlign: 'center' }}>Vendas</th>
+                        {/* Coluna Vendas removida */}
                         <th style={{ padding: '12px', textAlign: 'center' }}>Ações</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {games.map(game => (
-                        <tr key={game.id_jogo} style={{ borderBottom: '1px solid #2d7a2d' }}>
-                            <td style={{ padding: '12px' }}>#{game.id_jogo}</td>
-                            <td style={{ padding: '12px', fontWeight: 'bold', color: '#90ee90' }}>
-                                {game.SALA?.nome || rooms.find(r => r.id_sala === game.id_sala)?.nome || `Sala ${game.id_sala}`}
-                            </td>
-                            <td style={{ padding: '12px' }}>{new Date(game.data_hora).toLocaleString()}</td>
-                            <td style={{ padding: '12px' }}>R$ {Number(game.preco_cartela).toFixed(2)}</td>
-                            <td style={{ padding: '12px' }}>
-                                <span style={{ 
-                                    padding: '4px 8px', 
-                                    borderRadius: '4px', 
-                                    backgroundColor: game.status === 'AGUARDANDO' ? '#eab308' : '#22c55e',
-                                    color: 'black',
-                                    fontWeight: 'bold',
-                                    fontSize: '0.8rem'
-                                }}>
-                                    {game.status || 'Ativo'}
-                                </span>
-                            </td>
-                            <td style={{ padding: '12px', textAlign: 'center' }}>{game._count?.CARTELA || 0}</td>
-                            <td style={{ padding: '12px', textAlign: 'center' }}>
-                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                                    <button 
-                                        onClick={() => handleStartGame(game.id_jogo)}
-                                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
-                                        title="Iniciar"
-                                    >▶️</button>
-                                    <button 
-                                        onClick={() => openEditModal(game)}
-                                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
-                                        title="Editar"
-                                    >✏️</button>
-                                    <button 
-                                        onClick={() => handleDelete(game.id_jogo)}
-                                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
-                                        title="Excluir"
-                                    >🗑️</button>
-                                </div>
-                            </td>
-                        </tr>
-                    ))}
+                    {games.map(game => {
+                        const status = getGameStatus(game); // Usa a função auxiliar
+                        return (
+                            <tr key={game.id_jogo} style={{ borderBottom: '1px solid #2d7a2d' }}>
+                                <td style={{ padding: '12px' }}>#{game.id_jogo}</td>
+                                <td style={{ padding: '12px', fontWeight: 'bold', color: '#90ee90' }}>
+                                    {game.SALA?.nome || rooms.find(r => r.id_sala === game.id_sala)?.nome || `Sala ${game.id_sala}`}
+                                </td>
+                                <td style={{ padding: '12px' }}>{new Date(game.data_hora).toLocaleString()}</td>
+                                <td style={{ padding: '12px' }}>R$ {Number(game.preco_cartela).toFixed(2)}</td>
+                                <td style={{ padding: '12px' }}>
+                                    <span style={{ 
+                                        padding: '4px 8px', 
+                                        borderRadius: '4px', 
+                                        backgroundColor: status === 'AGUARDANDO' ? '#eab308' : (status === 'FINALIZADO' ? '#ef4444' : '#22c55e'),
+                                        color: 'black',
+                                        fontWeight: 'bold',
+                                        fontSize: '0.8rem'
+                                    }}>
+                                        {status}
+                                    </span>
+                                </td>
+                                
+                                <td style={{ padding: '12px', textAlign: 'center' }}>
+                                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                        
+                                        {/* Botão de INICIAR (Só se estiver AGUARDANDO) */}
+                                        {status === 'AGUARDANDO' && (
+                                            <button 
+                                                onClick={() => handleStartGame(game.id_jogo)}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                                                title="Iniciar Sorteio"
+                                            >▶️</button>
+                                        )}
+
+                                        {/* Botão de PARAR (Só se estiver ATIVO) */}
+                                        {status === 'ATIVO' && (
+                                            <button 
+                                                onClick={() => handleStopGame(game.id_jogo)}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                                                title="Finalizar Jogo"
+                                            >⏹️</button>
+                                        )}
+
+                                        <button 
+                                            onClick={() => openEditModal(game)}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                                            title="Editar"
+                                        >✏️</button>
+                                        <button 
+                                            onClick={() => handleDelete(game.id_jogo)}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                                            title="Excluir"
+                                        >🗑️</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        );
+                    })}
                     {games.length === 0 && (
                         <tr>
-                            <td colSpan={7} style={{ padding: '20px', textAlign: 'center', color: '#ccc' }}>
+                            <td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: '#ccc' }}>
                                 Nenhum jogo cadastrado.
                             </td>
                         </tr>
@@ -270,7 +317,7 @@ export default function GamesAdminPage() {
             </table>
         </div>
 
-        {/* MODAL */}
+        {/* Modal mantido igual */}
         {showForm && (
             <div style={{
                 position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -284,6 +331,7 @@ export default function GamesAdminPage() {
                         {editingGame ? 'Editar Jogo' : 'Criar Novo Jogo'}
                     </h2>
                     <form onSubmit={handleSubmit}>
+                        {/* ... Campos do formulário ... */}
                         <div style={{ marginBottom: '15px' }}>
                             <label style={{ color: 'white', display: 'block', marginBottom: '5px' }}>Sala Vinculada</label>
                             <select 

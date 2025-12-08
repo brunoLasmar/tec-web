@@ -45,7 +45,6 @@ export class GameLogicService {
       this.runningGames.set(gameId, gameState);
     }
 
-    // Reconexão: apenas atualiza log e envia estado
     if (gameState.activePlayers.has(userId)) {
         this.emitEvent(gameId, 'init', { drawnNumbers: Array.from(gameState.drawnNumbers) });
         return;
@@ -60,7 +59,7 @@ export class GameLogicService {
       );
 
       gameState.activePlayers.set(userId, { user, cards: matrixCards });
-      this.logger.log(`User ${user.nome} entrou no Jogo ${gameId} com ${matrixCards.length} cartelas.`);
+      this.logger.log(`User ${user.nome} entrou no Jogo ${gameId}`);
 
       this.emitEvent(gameId, 'init', { 
         drawnNumbers: Array.from(gameState.drawnNumbers) 
@@ -72,7 +71,9 @@ export class GameLogicService {
   }
 
   // --- CONTROLE ---
-  startGame(gameId: number) {
+  
+  // Alteração: startGame agora marca o jogo como ATIVO no banco
+  async startGame(gameId: number) {
     let state = this.runningGames.get(gameId);
     if (!state) {
       state = this.createInitialState();
@@ -81,7 +82,16 @@ export class GameLogicService {
 
     if (state.drawInterval) return { error: 'Jogo já rodando' };
 
-    // Se pool vazio, reinicia
+    // Atualiza status no banco para 'ATIVO'
+    try {
+        await this.prisma.jOGO.update({
+            where: { id_jogo: gameId },
+            data: { status: 'ATIVO' }
+        });
+    } catch (e) {
+        this.logger.error(`Erro ao marcar jogo ${gameId} como ATIVO: ${e.message}`);
+    }
+
     if (state.numberPool.length === 0) {
        state.numberPool = this.shuffledPool(75);
        state.drawnNumbers.clear();
@@ -111,7 +121,9 @@ export class GameLogicService {
 
     if (state.numberPool.length === 0) {
       this.stopGame(gameId);
-      this.emitEvent(gameId, 'end', { message: 'Fim dos números - Sem mais prêmios?' });
+      this.emitEvent(gameId, 'end', { message: 'Fim dos números' });
+      // Se acabaram os números, forçamos finalização
+      this.persistGameEnd(gameId); 
       return;
     }
 
@@ -126,74 +138,41 @@ export class GameLogicService {
       });
 
       this.saveDrawnNumber(gameId, n, state.drawnNumbers.size);
-
-      // Conferência de ganhadores a cada bola
       this.checkForBingoWinners(gameId, state, n);
     }
   }
 
   private async checkForBingoWinners(gameId: number, state: GameState, lastNumber: number) {
-    // Itera sobre todos os jogadores
     for (const [userId, data] of state.activePlayers.entries()) {
-      
-      // Itera sobre cartelas do jogador
-      // Usamos um for loop normal para poder usar 'await' se necessário, 
-      // mas como activePlayers está em memória, o loop é síncrono.
-      // A atribuição de prêmio é assíncrona, então fazemos fire-and-forget ou tratamos a Promise.
-      
       for (const card of data.cards) {
         if (this.checkBingo(card, state.drawnNumbers)) {
-          
-          // Verificamos se esse jogador JÁ ganhou esse prêmio ou se a cartela já bateu?
-          // (Simplificação: vamos tentar atribuir prêmio sempre que bater. 
-          // A função assignPrize vai garantir que só atribui se houver prêmio vago)
-          
+          // Tenta atribuir prêmio. Se retornar true, significa que ainda tem prêmios.
           await this.assignPrizeToWinner(gameId, userId, data.user.nome);
         }
       }
     }
   }
 
-  // --- NOVA LÓGICA DE PRÊMIOS ---
+  // --- LÓGICA DE PRÊMIOS ---
   
   private async assignPrizeToWinner(gameId: number, userId: number, userName: string) {
-    // 1. Busca prêmios do jogo que ainda não têm dono (id_usuario IS NULL)
-    // Ordena por VALOR decrescente (o maior primeiro)
     const availablePrizes = await this.prisma.pREMIOS.findMany({
-      where: {
-        id_jogo: gameId,
-        id_usuario: null
-      },
-      orderBy: {
-        valor: 'desc'
-      }
+      where: { id_jogo: gameId, id_usuario: null },
+      orderBy: { valor: 'desc' }
     });
 
-    // Se não tem prêmio, o jogo já deveria ter acabado, ou esse jogador bateu tarde demais.
-    if (availablePrizes.length === 0) {
-      return; 
-    }
+    if (availablePrizes.length === 0) return;
 
-    // 2. Pega o melhor prêmio disponível
     const prizeToGive = availablePrizes[0];
 
-    // 3. Atribui atomicamente (para evitar race condition se dois baterem juntos)
-    // Usamos updateMany com where null para garantir que ninguém pegou no meio tempo
     const result = await this.prisma.pREMIOS.updateMany({
-      where: {
-        id_premio: prizeToGive.id_premio,
-        id_usuario: null // Garante que ainda está livre
-      },
-      data: {
-        id_usuario: userId
-      }
+      where: { id_premio: prizeToGive.id_premio, id_usuario: null },
+      data: { id_usuario: userId }
     });
 
     if (result.count > 0) {
-      // Sucesso! O jogador ganhou este prêmio.
-      this.logger.warn(`🏆 PRÊMIO ATRIBUÍDO: ${prizeToGive.descricao} (R$ ${prizeToGive.valor}) para ${userName}`);
+      this.logger.warn(`🏆 PRÊMIO: ${prizeToGive.descricao} para ${userName}`);
 
-      // Avisa o Frontend
       this.emitEvent(gameId, 'bingo_winner', {
         winnerName: userName,
         prize: prizeToGive.descricao,
@@ -201,28 +180,27 @@ export class GameLogicService {
         timestamp: new Date()
       });
 
-      // 4. Verifica se ACABARAM os prêmios
-      // Se availablePrizes tinha tamanho 1, agora tem 0 (pois acabamos de dar 1)
+      // Se este foi o último prêmio, encerra o jogo
       if (availablePrizes.length === 1) {
-        this.logger.log(`🏁 Todos os prêmios do Jogo ${gameId} foram distribuídos. Encerrando...`);
+        this.logger.log(`🏁 Todos os prêmios do Jogo ${gameId} saíram.`);
         this.stopGame(gameId);
-        this.persistGameEnd(gameId, userId); // Grava o último vencedor como "vencedor do jogo" para fins de histórico
+        this.persistGameEnd(gameId); // <--- Alterado: não passa mais ID do vencedor
       }
     }
   }
 
-  // --- PERSISTÊNCIA ---
+  // --- PERSISTÊNCIA (Alterado) ---
   
-  private async persistGameEnd(gameId: number, lastWinnerId: number) {
+  private async persistGameEnd(gameId: number) {
     try {
-      // Define o jogo como encerrado (vencedor definido) para o Scheduler não reiniciar
+      // Atualiza status para FINALIZADO
       await this.prisma.jOGO.update({
         where: { id_jogo: gameId },
         data: { 
-            id_usuario_vencedor: lastWinnerId, // Pode ser o último ganhador ou lógica personalizada
+            status: 'FINALIZADO' // <--- Nova lógica
         }
       });
-      this.logger.log(`✅ Jogo ${gameId} marcado como finalizado no banco.`);
+      this.logger.log(`✅ Jogo ${gameId} marcado como FINALIZADO no banco.`);
     } catch (error) {
       this.logger.error(`❌ Erro ao finalizar jogo no banco: ${error.message}`);
     }
@@ -236,7 +214,7 @@ export class GameLogicService {
       } catch(e) {}
   }
 
-  // --- HELPERS (Matriz, Shuffle, etc - Sem alterações) ---
+  // --- HELPERS ---
   private createInitialState(): GameState {
     return { numberPool: [], drawnNumbers: new Set(), drawInterval: null, activePlayers: new Map() };
   }
@@ -244,16 +222,12 @@ export class GameLogicService {
   private checkBingo(card: number[][], drawn: Set<number>): boolean {
     const size = 5;
     const marked = card.map(row => row.map(n => n === 0 || drawn.has(n)));
-    
-    // Linhas
     for (let r = 0; r < size; r++) if (marked[r].every(Boolean)) return true;
-    // Colunas
     for (let c = 0; c < size; c++) {
         let colOk = true;
         for(let r=0; r<size; r++) if(!marked[r][c]) colOk = false;
         if(colOk) return true;
     }
-    // Diagonais
     let d1=true, d2=true;
     for(let i=0; i<size; i++) {
         if(!marked[i][i]) d1=false;

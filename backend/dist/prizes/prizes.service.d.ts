@@ -11,11 +11,11 @@ export declare class PrizesService {
             data_hora: Date;
         };
     } & {
-        descricao: string;
-        valor: Prisma.Decimal;
-        id_premio: number;
         id_usuario: number | null;
         id_jogo: number;
+        descricao: string;
+        id_premio: number;
+        valor: Prisma.Decimal;
     }>;
     findAll(): Prisma.PrismaPromise<({
         JOGO: {
@@ -26,51 +26,51 @@ export declare class PrizesService {
         };
         USUARIO: {
             id_usuario: number;
-            nome: string;
             email: string;
+            nome: string;
         };
     } & {
-        descricao: string;
-        valor: Prisma.Decimal;
-        id_premio: number;
         id_usuario: number | null;
         id_jogo: number;
+        descricao: string;
+        id_premio: number;
+        valor: Prisma.Decimal;
     })[]>;
     findOne(id: number): Promise<{
         JOGO: {
             id_jogo: number;
             data_hora: Date;
             id_sala: number;
-            id_usuario_vencedor: number | null;
             preco_cartela: Prisma.Decimal;
+            status: string;
         };
         USUARIO: {
             id_usuario: number;
             nome: string;
         };
     } & {
-        descricao: string;
-        valor: Prisma.Decimal;
-        id_premio: number;
         id_usuario: number | null;
         id_jogo: number;
+        descricao: string;
+        id_premio: number;
+        valor: Prisma.Decimal;
     }>;
     update(id: number, updatePrizeDto: UpdatePrizeDto): Promise<{
         USUARIO: {
             nome: string;
         };
     } & {
-        descricao: string;
-        valor: Prisma.Decimal;
-        id_premio: number;
         id_usuario: number | null;
         id_jogo: number;
+        descricao: string;
+        id_premio: number;
+        valor: Prisma.Decimal;
     }>;
     remove(id: number): Promise<{
-        descricao: string;
-        valor: Prisma.Decimal;
-        id_premio: number;
         id_usuario: number | null;
         id_jogo: number;
+        descricao: string;
+        id_premio: number;
+        valor: Prisma.Decimal;
     }>;
 }

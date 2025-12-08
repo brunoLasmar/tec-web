@@ -10,11 +10,11 @@ export declare class PrizesController {
             data_hora: Date;
         };
     } & {
-        descricao: string;
-        valor: import("@prisma/client/runtime/library").Decimal;
-        id_premio: number;
         id_usuario: number | null;
         id_jogo: number;
+        descricao: string;
+        id_premio: number;
+        valor: import("@prisma/client/runtime/library").Decimal;
     }>;
     findAll(): import(".prisma/client").Prisma.PrismaPromise<({
         JOGO: {
@@ -25,51 +25,51 @@ export declare class PrizesController {
         };
         USUARIO: {
             id_usuario: number;
-            nome: string;
             email: string;
+            nome: string;
         };
     } & {
-        descricao: string;
-        valor: import("@prisma/client/runtime/library").Decimal;
-        id_premio: number;
         id_usuario: number | null;
         id_jogo: number;
+        descricao: string;
+        id_premio: number;
+        valor: import("@prisma/client/runtime/library").Decimal;
     })[]>;
     findOne(id: number): Promise<{
         JOGO: {
             id_jogo: number;
             data_hora: Date;
             id_sala: number;
-            id_usuario_vencedor: number | null;
             preco_cartela: import("@prisma/client/runtime/library").Decimal;
+            status: string;
         };
         USUARIO: {
             id_usuario: number;
             nome: string;
         };
     } & {
-        descricao: string;
-        valor: import("@prisma/client/runtime/library").Decimal;
-        id_premio: number;
         id_usuario: number | null;
         id_jogo: number;
+        descricao: string;
+        id_premio: number;
+        valor: import("@prisma/client/runtime/library").Decimal;
     }>;
     update(id: number, updatePrizeDto: UpdatePrizeDto): Promise<{
         USUARIO: {
             nome: string;
         };
     } & {
-        descricao: string;
-        valor: import("@prisma/client/runtime/library").Decimal;
-        id_premio: number;
         id_usuario: number | null;
         id_jogo: number;
+        descricao: string;
+        id_premio: number;
+        valor: import("@prisma/client/runtime/library").Decimal;
     }>;
     remove(id: number): Promise<{
-        descricao: string;
-        valor: import("@prisma/client/runtime/library").Decimal;
-        id_premio: number;
         id_usuario: number | null;
         id_jogo: number;
+        descricao: string;
+        id_premio: number;
+        valor: import("@prisma/client/runtime/library").Decimal;
     }>;
 }

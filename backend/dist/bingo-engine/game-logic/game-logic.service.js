@@ -46,7 +46,7 @@ let GameLogicService = GameLogicService_1 = class GameLogicService {
             const dbCards = await this.cardsService.getUserCards(userId, gameId);
             const matrixCards = dbCards.map(c => this.convertDbListToMatrix(c.NUMEROS_CARTELA.map(n => n.numero)));
             gameState.activePlayers.set(userId, { user, cards: matrixCards });
-            this.logger.log(`User ${user.nome} entrou no Jogo ${gameId} com ${matrixCards.length} cartelas.`);
+            this.logger.log(`User ${user.nome} entrou no Jogo ${gameId}`);
             this.emitEvent(gameId, 'init', {
                 drawnNumbers: Array.from(gameState.drawnNumbers)
             });
@@ -55,7 +55,7 @@ let GameLogicService = GameLogicService_1 = class GameLogicService {
             this.logger.error(`Erro conexão user ${userId}: ${error.message}`);
         }
     }
-    startGame(gameId) {
+    async startGame(gameId) {
         let state = this.runningGames.get(gameId);
         if (!state) {
             state = this.createInitialState();
@@ -63,6 +63,15 @@ let GameLogicService = GameLogicService_1 = class GameLogicService {
         }
         if (state.drawInterval)
             return { error: 'Jogo já rodando' };
+        try {
+            await this.prisma.jOGO.update({
+                where: { id_jogo: gameId },
+                data: { status: 'ATIVO' }
+            });
+        }
+        catch (e) {
+            this.logger.error(`Erro ao marcar jogo ${gameId} como ATIVO: ${e.message}`);
+        }
         if (state.numberPool.length === 0) {
             state.numberPool = this.shuffledPool(75);
             state.drawnNumbers.clear();
@@ -87,7 +96,8 @@ let GameLogicService = GameLogicService_1 = class GameLogicService {
             return;
         if (state.numberPool.length === 0) {
             this.stopGame(gameId);
-            this.emitEvent(gameId, 'end', { message: 'Fim dos números - Sem mais prêmios?' });
+            this.emitEvent(gameId, 'end', { message: 'Fim dos números' });
+            this.persistGameEnd(gameId);
             return;
         }
         const n = state.numberPool.shift();
@@ -113,29 +123,18 @@ let GameLogicService = GameLogicService_1 = class GameLogicService {
     }
     async assignPrizeToWinner(gameId, userId, userName) {
         const availablePrizes = await this.prisma.pREMIOS.findMany({
-            where: {
-                id_jogo: gameId,
-                id_usuario: null
-            },
-            orderBy: {
-                valor: 'desc'
-            }
+            where: { id_jogo: gameId, id_usuario: null },
+            orderBy: { valor: 'desc' }
         });
-        if (availablePrizes.length === 0) {
+        if (availablePrizes.length === 0)
             return;
-        }
         const prizeToGive = availablePrizes[0];
         const result = await this.prisma.pREMIOS.updateMany({
-            where: {
-                id_premio: prizeToGive.id_premio,
-                id_usuario: null
-            },
-            data: {
-                id_usuario: userId
-            }
+            where: { id_premio: prizeToGive.id_premio, id_usuario: null },
+            data: { id_usuario: userId }
         });
         if (result.count > 0) {
-            this.logger.warn(`🏆 PRÊMIO ATRIBUÍDO: ${prizeToGive.descricao} (R$ ${prizeToGive.valor}) para ${userName}`);
+            this.logger.warn(`🏆 PRÊMIO: ${prizeToGive.descricao} para ${userName}`);
             this.emitEvent(gameId, 'bingo_winner', {
                 winnerName: userName,
                 prize: prizeToGive.descricao,
@@ -143,21 +142,21 @@ let GameLogicService = GameLogicService_1 = class GameLogicService {
                 timestamp: new Date()
             });
             if (availablePrizes.length === 1) {
-                this.logger.log(`🏁 Todos os prêmios do Jogo ${gameId} foram distribuídos. Encerrando...`);
+                this.logger.log(`🏁 Todos os prêmios do Jogo ${gameId} saíram.`);
                 this.stopGame(gameId);
-                this.persistGameEnd(gameId, userId);
+                this.persistGameEnd(gameId);
             }
         }
     }
-    async persistGameEnd(gameId, lastWinnerId) {
+    async persistGameEnd(gameId) {
         try {
             await this.prisma.jOGO.update({
                 where: { id_jogo: gameId },
                 data: {
-                    id_usuario_vencedor: lastWinnerId,
+                    status: 'FINALIZADO'
                 }
             });
-            this.logger.log(`✅ Jogo ${gameId} marcado como finalizado no banco.`);
+            this.logger.log(`✅ Jogo ${gameId} marcado como FINALIZADO no banco.`);
         }
         catch (error) {
             this.logger.error(`❌ Erro ao finalizar jogo no banco: ${error.message}`);

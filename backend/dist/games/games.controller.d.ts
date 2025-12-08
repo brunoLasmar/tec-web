@@ -11,36 +11,36 @@ export declare class GamesController {
     private readonly gameLogic;
     constructor(gamesService: GamesService, gameLogic: GameLogicService);
     create(createGameDto: CreateGameDto): import(".prisma/client").Prisma.Prisma__JOGOClient<{
-        data_hora: Date;
-        preco_cartela: import("@prisma/client/runtime/library").Decimal;
         id_jogo: number;
+        data_hora: Date;
         id_sala: number;
-        id_usuario_vencedor: number | null;
+        preco_cartela: import("@prisma/client/runtime/library").Decimal;
+        status: string;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
     findAll(): import(".prisma/client").Prisma.PrismaPromise<({
         SALA: {
             nome: string;
         };
     } & {
-        data_hora: Date;
-        preco_cartela: import("@prisma/client/runtime/library").Decimal;
         id_jogo: number;
+        data_hora: Date;
         id_sala: number;
-        id_usuario_vencedor: number | null;
+        preco_cartela: import("@prisma/client/runtime/library").Decimal;
+        status: string;
     })[]>;
     findOne(id: string): Promise<{
-        data_hora: Date;
-        preco_cartela: import("@prisma/client/runtime/library").Decimal;
         id_jogo: number;
+        data_hora: Date;
         id_sala: number;
-        id_usuario_vencedor: number | null;
+        preco_cartela: import("@prisma/client/runtime/library").Decimal;
+        status: string;
     }>;
     update(id: string, updateGameDto: UpdateGameDto): Promise<{
-        data_hora: Date;
-        preco_cartela: import("@prisma/client/runtime/library").Decimal;
         id_jogo: number;
+        data_hora: Date;
         id_sala: number;
-        id_usuario_vencedor: number | null;
+        preco_cartela: import("@prisma/client/runtime/library").Decimal;
+        status: string;
     }>;
     remove(id: string): Promise<void>;
     buyCards(buyCardsDto: BuyCardsDto, req: AuthenticatedRequest): Promise<{
@@ -48,13 +48,13 @@ export declare class GamesController {
         cards: any[];
     }>;
     stream(gameIdStr: string, userId: string): Observable<MessageEvent>;
-    startGame(id: string): {
+    startGame(id: string): Promise<{
         error: string;
         ok?: undefined;
     } | {
         ok: boolean;
         error?: undefined;
-    };
+    }>;
     stopGame(id: string): {
         ok: boolean;
     };

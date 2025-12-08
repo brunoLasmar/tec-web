@@ -16,13 +16,13 @@ export declare class GameLogicService {
     constructor(usersService: UsersService, cardsService: CardsService, prisma: PrismaService);
     getEventStream(): import("rxjs").Observable<GameEvent>;
     handleConnection(gameId: number, userIdString: string): Promise<void>;
-    startGame(gameId: number): {
+    startGame(gameId: number): Promise<{
         error: string;
         ok?: undefined;
     } | {
         ok: boolean;
         error?: undefined;
-    };
+    }>;
     stopGame(gameId: number): {
         ok: boolean;
     };
