@@ -76,7 +76,10 @@ let GamesService = class GamesService {
     findAll() {
         return this.prisma.jOGO.findMany({
             orderBy: { data_hora: 'asc' },
-            include: { SALA: { select: { nome: true } } }
+            include: {
+                SALA: { select: { nome: true } },
+                PREMIOS: { select: { valor: true } }
+            }
         });
     }
     async findOne(id) {

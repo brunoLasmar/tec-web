@@ -11,36 +11,39 @@ export declare class GamesController {
     private readonly gameLogic;
     constructor(gamesService: GamesService, gameLogic: GameLogicService);
     create(createGameDto: CreateGameDto): import(".prisma/client").Prisma.Prisma__JOGOClient<{
-        id_jogo: number;
         data_hora: Date;
-        id_sala: number;
         preco_cartela: import("@prisma/client/runtime/library").Decimal;
         status: string;
+        id_jogo: number;
+        id_sala: number;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
     findAll(): import(".prisma/client").Prisma.PrismaPromise<({
         SALA: {
             nome: string;
         };
+        PREMIOS: {
+            valor: import("@prisma/client/runtime/library").Decimal;
+        }[];
     } & {
-        id_jogo: number;
         data_hora: Date;
-        id_sala: number;
         preco_cartela: import("@prisma/client/runtime/library").Decimal;
         status: string;
+        id_jogo: number;
+        id_sala: number;
     })[]>;
     findOne(id: string): Promise<{
-        id_jogo: number;
         data_hora: Date;
-        id_sala: number;
         preco_cartela: import("@prisma/client/runtime/library").Decimal;
         status: string;
+        id_jogo: number;
+        id_sala: number;
     }>;
     update(id: string, updateGameDto: UpdateGameDto): Promise<{
-        id_jogo: number;
         data_hora: Date;
-        id_sala: number;
         preco_cartela: import("@prisma/client/runtime/library").Decimal;
         status: string;
+        id_jogo: number;
+        id_sala: number;
     }>;
     remove(id: string): Promise<void>;
     buyCards(buyCardsDto: BuyCardsDto, req: AuthenticatedRequest): Promise<{

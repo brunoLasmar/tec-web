@@ -13,58 +13,61 @@ export declare class GamesService {
     }>;
     private generateCardNumbers;
     create(createGameDto: CreateGameDto): Prisma.Prisma__JOGOClient<{
-        id_jogo: number;
         data_hora: Date;
-        id_sala: number;
         preco_cartela: Prisma.Decimal;
         status: string;
+        id_jogo: number;
+        id_sala: number;
     }, never, import("@prisma/client/runtime/library").DefaultArgs, Prisma.PrismaClientOptions>;
     findAll(): Prisma.PrismaPromise<({
         SALA: {
             nome: string;
         };
+        PREMIOS: {
+            valor: Prisma.Decimal;
+        }[];
     } & {
-        id_jogo: number;
         data_hora: Date;
-        id_sala: number;
         preco_cartela: Prisma.Decimal;
         status: string;
+        id_jogo: number;
+        id_sala: number;
     })[]>;
     findOne(id: number): Promise<{
-        id_jogo: number;
         data_hora: Date;
-        id_sala: number;
         preco_cartela: Prisma.Decimal;
         status: string;
+        id_jogo: number;
+        id_sala: number;
     }>;
     findOneWithDetails(id: number): Promise<{
-        _count: {
-            CARTELA: number;
-        };
         SALA: {
-            nome: string;
             id_sala: number;
+            nome: string;
             descricao: string | null;
         };
         NUMEROS_SORTEADOS: {
             id_jogo: number;
-            numero: number;
             ordem_sorteio: number;
             id_numero_sorteado: number;
+            numero: number;
         }[];
+        _count: {
+            CARTELA: number;
+        };
     } & {
-        id_jogo: number;
         data_hora: Date;
-        id_sala: number;
         preco_cartela: Prisma.Decimal;
         status: string;
+        id_jogo: number;
+        id_sala: number;
     }>;
     update(id: number, updateGameDto: UpdateGameDto): Promise<{
-        id_jogo: number;
         data_hora: Date;
-        id_sala: number;
         preco_cartela: Prisma.Decimal;
         status: string;
+        id_jogo: number;
+        id_sala: number;
     }>;
     remove(id: number): Promise<void>;
 }
