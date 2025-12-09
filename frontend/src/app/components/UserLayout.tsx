@@ -19,6 +19,43 @@ export default function UserLayout({ children }: UserLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
 
+  const formatDecimal = (val: any): number => {
+    try {
+      if (typeof val === 'number') {
+        return val;
+      }
+      if (typeof val === 'string') {
+        return parseFloat(val) || 0;
+      }
+      if (typeof val === 'object' && val !== null && Array.isArray(val.d)) {
+        const sign = val.s || 1;
+        const exponent = val.e !== undefined ? val.e : 0;
+        let allDigits = '';
+        for (let i = 0; i < val.d.length; i++) {
+          if (i === 0) {
+            allDigits += val.d[i].toString();
+          } else {
+            allDigits += val.d[i].toString().padStart(7, '0');
+          }
+        }
+        const decimalPosition = exponent + 1;
+        let numStr: string;
+        if (decimalPosition <= 0) {
+          numStr = '0.' + '0'.repeat(-decimalPosition) + allDigits;
+        } else if (decimalPosition >= allDigits.length) {
+          numStr = allDigits + '0'.repeat(decimalPosition - allDigits.length);
+        } else {
+          numStr = allDigits.slice(0, decimalPosition) + '.' + allDigits.slice(decimalPosition);
+        }
+        return parseFloat(numStr) * sign;
+      }
+      return 0;
+    } catch (error) {
+      console.error('Erro na conversão de decimal:', error);
+      return 0;
+    }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('bingoToken');
     if (!token) {
@@ -38,7 +75,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
         if (response.ok) {
           const userData = await response.json();
           setUser(userData);
-          setUserBalance(parseFloat(userData.creditos) || 0);
+          setUserBalance(formatDecimal(userData.creditos));
         } else {
           throw new Error('Falha ao carregar perfil');
         }
@@ -68,7 +105,10 @@ export default function UserLayout({ children }: UserLayoutProps) {
 
       if (response.ok) {
         const data = await response.json();
-        setUserBalance(parseFloat(data.creditos));
+        // A resposta da recarga pode vir em formatos diferentes dependendo do backend
+        // Se vier { newBalance: ... } ou { creditos: ... }
+        const newCreditos = data.newBalance !== undefined ? data.newBalance : data.creditos;
+        setUserBalance(formatDecimal(newCreditos));
         alert(`Créditos recarregados com sucesso! R$ ${amount.toFixed(2)} adicionados à sua conta.`);
       } else {
         alert('Erro ao recarregar créditos.');
@@ -128,6 +168,12 @@ export default function UserLayout({ children }: UserLayoutProps) {
                 className={`nav-link ${isActiveRoute('/como-jogar') ? 'active' : ''}`}
               >
                 Como Jogar
+              </a>
+              <a 
+                href="/estatisticas" 
+                className={`nav-link ${isActiveRoute('/estatisticas') ? 'active' : ''}`}
+              >
+                Relatórios
               </a>
             </div>
 
