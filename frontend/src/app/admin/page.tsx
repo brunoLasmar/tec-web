@@ -100,6 +100,7 @@ export default function AdminDashboard() {
                     width: '100%',
                     maxWidth: '900px'
                 }}>
+                    {/* CARD USUÁRIOS */}
                     <div style={{
                         backgroundColor: '#1a5f1a',
                         padding: '40px 30px',
@@ -129,6 +130,7 @@ export default function AdminDashboard() {
                         </p>
                     </div>
 
+                    {/* CARD SALAS */}
                     <div style={{
                         backgroundColor: '#1a5f1a',
                         padding: '40px 30px',
@@ -158,6 +160,7 @@ export default function AdminDashboard() {
                         </p>
                     </div>
 
+                    {/* CARD JOGOS */}
                     <div style={{
                         backgroundColor: '#1a5f1a',
                         padding: '40px 30px',
@@ -187,6 +190,7 @@ export default function AdminDashboard() {
                         </p>
                     </div>
 
+                    {/* CARD PRÊMIOS */}
                     <div style={{
                         backgroundColor: '#1a5f1a',
                         padding: '40px 30px',
@@ -213,6 +217,36 @@ export default function AdminDashboard() {
                         </h3>
                         <p style={{ margin: 0, opacity: 0.9 }}>
                             Defina e gerencie prêmios dos jogos
+                        </p>
+                    </div>
+
+                    {/* NOVO CARD: RELATÓRIOS (Estilo Igual) */}
+                    <div style={{
+                        backgroundColor: '#1a5f1a',
+                        padding: '40px 30px',
+                        borderRadius: '12px',
+                        color: 'white',
+                        textAlign: 'center',
+                        boxShadow: '0 6px 12px rgba(0, 0, 0, 0.3)',
+                        border: '2px solid #2d7a2d',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+                    }}
+                    onClick={() => handleNavigation('reports/rooms')}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-5px)';
+                        e.currentTarget.style.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.4)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 6px 12px rgba(0, 0, 0, 0.3)';
+                    }}
+                    >
+                        <h3 style={{ margin: '0 0 15px 0', fontSize: '1.5em' }}>
+                            📊 Relatórios de Salas
+                        </h3>
+                        <p style={{ margin: 0, opacity: 0.9 }}>
+                            Visualize métricas de salas e ocupação
                         </p>
                     </div>
                 </div>

@@ -1,11 +1,11 @@
-import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AdminGuard } from '../auth/guards/admin.guard';
+import { IsPublic } from '../auth/decorators/is-public.decorator';
 
 @Controller('reports')
-@UseGuards(JwtAuthGuard) // Garante que precisa estar logado
+@UseGuards(JwtAuthGuard) // <--- Protege todas as rotas (exige login)
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
@@ -15,9 +15,8 @@ export class ReportsController {
     return this.reportsService.relatorio1(req.user, targetId);
   }
 
-  // Apenas Admin pode ver métricas gerais de sala para proteger dados
   @Get('relatorio2')
-  @UseGuards(AdminGuard)
+  // @IsPublic() <--- REMOVIDO: Agora exige login, mas qualquer usuário pode ver
   getRelatorio2() {
     return this.reportsService.relatorio2();
   }
