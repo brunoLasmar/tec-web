@@ -1,4 +1,3 @@
-// app/rooms/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -14,62 +13,42 @@ interface Room {
   descricao?: string;
   jogadores_ativos?: number;
   capacidade_maxima?: number;
-  status?: string;
   totalPrizes?: number;
 }
 
 interface Game {
   id_jogo: number;
   id_sala: number;
-  status: string;
-  premios?: { valor: any }[];
+  data_hora: string;
+  status?: string;
+  id_usuario_vencedor?: number | null;
+  PREMIOS?: { valor: any }[];
 }
 
-interface Prize {
-  id_premio: number;
-  valor: any;
-  id_jogo: number;
-}
-
+// Função de formatação para lidar com decimais do Prisma
 const formatDecimal = (val: any): number => {
   try {
-    if (typeof val === 'number') {
-      return val;
-    }
-    if (typeof val === 'string') {
-      return parseFloat(val) || 0;
-    }
-    if (typeof val === 'object' && val !== null && Array.isArray(val.d)) {
-      const sign = val.s || 1;
-      const exponent = val.e !== undefined ? val.e : 0;
-      let allDigits = '';
-      for (let i = 0; i < val.d.length; i++) {
-        if (i === 0) {
-          allDigits += val.d[i].toString();
-        } else {
-          allDigits += val.d[i].toString().padStart(7, '0');
-        }
-      }
-      const decimalPosition = exponent + 1;
-      let numStr: string;
-      if (decimalPosition <= 0) {
-        numStr = '0.' + '0'.repeat(-decimalPosition) + allDigits;
-      } else if (decimalPosition >= allDigits.length) {
-        numStr = allDigits + '0'.repeat(decimalPosition - allDigits.length);
-      } else {
-        numStr = allDigits.slice(0, decimalPosition) + '.' + allDigits.slice(decimalPosition);
-      }
-      return parseFloat(numStr) * sign;
-    }
-    if (typeof val === 'object' && val !== null && typeof val.toString === 'function') {
-      const str = val.toString();
-      if (str !== '[object Object]') return parseFloat(str) || 0;
+    if (typeof val === 'number') return val;
+    if (typeof val === 'string') return parseFloat(val) || 0;
+    if (val && typeof val === 'object' && val.toString) {
+      // Tenta converter objeto Decimal para string e depois float
+      const s = val.toString();
+      return s !== '[object Object]' ? parseFloat(s) || 0 : 0;
     }
     return 0;
   } catch (error) {
-    console.error('Erro na conversão de decimal:', error);
     return 0;
   }
+};
+
+// Lógica de status unificada com o Admin
+const getGameStatus = (game: Game) => {
+    if (game.status) return game.status;
+    if (game.id_usuario_vencedor) return 'FINALIZADO';
+    const gameDate = new Date(game.data_hora);
+    const now = new Date();
+    if (now >= gameDate) return 'ATIVO';
+    return 'AGUARDANDO';
 };
 
 export default function RoomsPage() {
@@ -79,67 +58,60 @@ export default function RoomsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const loadRooms = async () => {
+    const loadData = async () => {
       const token = localStorage.getItem('bingoToken');
-      if (!token) {
-        router.push('/login');
-        return;
-      }
+      if (!token) return router.push('/login');
 
       try {
         setError(null);
         
-        const [roomsResponse, gamesResponse, prizesResponse] = await Promise.all([
-          fetch(`${API_BASE}/rooms`, { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch(`${API_BASE}/games`, { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch(`${API_BASE}/prizes`, { headers: { 'Authorization': `Bearer ${token}` } })
+        // 1. Busca Salas e Jogos (com no-store para evitar cache velho)
+        const [roomsRes, gamesRes] = await Promise.all([
+          fetch(`${API_BASE}/rooms`, { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' }),
+          fetch(`${API_BASE}/games`, { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' })
         ]);
 
-        if (roomsResponse.ok) {
-          const roomsData: Room[] = await roomsResponse.json();
-          let gamesData: Game[] = gamesResponse.ok ? await gamesResponse.json() : [];
+        if (roomsRes.ok && gamesRes.ok) {
+          const roomsData: Room[] = await roomsRes.json();
+          const gamesData: Game[] = await gamesRes.json();
 
-          // "Enriquecer" cada jogo com seus prêmios, buscando os detalhes
-          const enrichedGamesData = await Promise.all(
-            gamesData.map(async (game) => {
-              const gameDetailResponse = await fetch(`${API_BASE}/games/${game.id_jogo}`, { headers: { 'Authorization': `Bearer ${token}` } });
-              if (gameDetailResponse.ok) {
-                const gameDetail = await gameDetailResponse.json();
-                return { ...game, premios: gameDetail.premios || [] };
-              }
-              return game;
-            })
-          );
+          console.log("DEBUG - Jogos recebidos:", gamesData); // <--- OLHE NO CONSOLE (F12)
 
-          const prizesByRoom = enrichedGamesData
-            .filter(game => game.status === 'agendado' || game.status === 'em_andamento')
-            .reduce((acc, game) => {
-              const gamePrizesTotal = game.premios?.reduce((sum, prize) => sum + formatDecimal(prize.valor), 0) || 0;
-              acc[game.id_sala] = (acc[game.id_sala] || 0) + gamePrizesTotal;
-              return acc;
-            }, {} as { [key: number]: number });
+          const prizesByRoom: { [key: number]: number } = {};
+
+          gamesData.forEach(game => {
+             const status = getGameStatus(game);
+             // Apenas soma se o jogo estiver "vivo"
+             if (status === 'AGUARDANDO' || status === 'ATIVO') {
+                 // Verifica se PREMIOS existe antes de reduzir
+                 const premios = game.PREMIOS || [];
+                 const totalGamePrizes = premios.reduce((sum, p) => sum + formatDecimal(p.valor), 0);
+                 
+                 if (!prizesByRoom[game.id_sala]) prizesByRoom[game.id_sala] = 0;
+                 prizesByRoom[game.id_sala] += totalGamePrizes;
+             }
+          });
+
+          console.log("DEBUG - Prêmios por sala:", prizesByRoom); // <--- OLHE NO CONSOLE (F12)
 
           const enrichedRooms = roomsData.map(room => ({
             ...room,
             totalPrizes: prizesByRoom[room.id_sala] || 0
           }));
 
-          console.log('Salas enriquecidas:', enrichedRooms);
-          setRooms(Array.isArray(enrichedRooms) ? enrichedRooms : []);
-
+          setRooms(enrichedRooms);
         } else {
-          const errorText = await roomsResponse.text();
-          throw new Error(`Erro ${roomsResponse.status}: ${errorText}`);
+          throw new Error('Falha ao carregar dados.');
         }
       } catch (error) {
-        console.error('Erro ao carregar salas:', error);
-        setError('Erro ao carregar salas. Tente novamente.');
+        console.error('Erro:', error);
+        setError('Não foi possível carregar as salas.');
       } finally {
         setLoading(false);
       }
     };
 
-    loadRooms();
+    loadData();
   }, [router]);
 
   const enterRoom = (roomId: number) => {
@@ -149,12 +121,7 @@ export default function RoomsPage() {
   if (loading) {
     return (
       <UserLayout>
-        <div className="loading" style={{ 
-          textAlign: 'center', 
-          padding: '3rem', 
-          fontSize: '1.2rem', 
-          color: '#1B6F09' 
-        }}>
+        <div className="loading" style={{ textAlign: 'center', padding: '3rem', fontSize: '1.2rem', color: '#1B6F09' }}>
           Carregando salas...
         </div>
       </UserLayout>
@@ -165,11 +132,7 @@ export default function RoomsPage() {
     <UserLayout>
       <div className="rooms-container" style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
         <div className="rooms-header" style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h1 className="title" style={{ 
-            color: '#1B6F09', 
-            fontSize: '2.5rem',
-            marginBottom: '0.5rem'
-          }}>
+          <h1 className="title" style={{ color: '#1B6F09', fontSize: '2.5rem', marginBottom: '0.5rem' }}>
             Salas de Bingo Disponíveis
           </h1>
           <p style={{ color: '#666', fontSize: '1.1rem' }}>
@@ -179,13 +142,8 @@ export default function RoomsPage() {
 
         {error && (
           <div style={{ 
-            color: 'red', 
-            textAlign: 'center', 
-            marginBottom: '20px',
-            padding: '15px',
-            backgroundColor: '#ffe6e6',
-            borderRadius: '8px',
-            border: '1px solid #ffcccc'
+            color: 'red', textAlign: 'center', marginBottom: '20px', padding: '15px',
+            backgroundColor: '#ffe6e6', borderRadius: '8px', border: '1px solid #ffcccc'
           }}>
             {error}
           </div>
@@ -234,18 +192,6 @@ export default function RoomsPage() {
                 }}>
                   {room.nome}
                 </h3>
-                {room.status && (
-                  <span style={{
-                    background: '#E2F67E',
-                    color: '#1B6F09',
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: '20px',
-                    fontSize: '0.875rem',
-                    fontWeight: '600'
-                  }}>
-                    {room.status}
-                  </span>
-                )}
               </div>
 
               {room.descricao && (
@@ -265,7 +211,7 @@ export default function RoomsPage() {
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
-                  <span style={{ color: '#E2F67E', fontWeight: '600' }}>Jogadores Ativos:</span>
+                  <span style={{ color: '#E2F67E', fontWeight: '600' }}>Jogadores:</span>
                   <span style={{ color: 'white', fontWeight: 'bold' }}>
                     {room.jogadores_ativos || 0}/{room.capacidade_maxima || '∞'}
                   </span>
@@ -276,7 +222,7 @@ export default function RoomsPage() {
                   alignItems: 'center',
                   marginTop: '0.5rem'
                 }}>
-                  <span style={{ color: '#E2F67E', fontWeight: '600' }}>Prêmio Total:</span>
+                  <span style={{ color: '#E2F67E', fontWeight: '600' }}>Prêmios na Sala:</span>
                   <span style={{ color: 'white', fontWeight: 'bold' }}>
                     R$ {(room.totalPrizes || 0).toFixed(2)}
                   </span>
