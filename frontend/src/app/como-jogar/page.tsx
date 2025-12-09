@@ -10,7 +10,7 @@ const Regras = [
   { numero: 2, titulo: 'Compre suas cartelas', descricao: 'Escolha pacotes prontos ou monte sua própria cartela.' },
   { numero: 3, titulo: 'Acompanhe o sorteio', descricao: 'As bolas vão sendo sorteadas em tempo real.' },
   { numero: 4, titulo: 'Marque sua cartela', descricao: 'Seus números são destacados automaticamente.' },
-  { numero: 5, titulo: 'Grite BINGO! 🎉', descricao: 'Ao completar a cartela, clique no botão \"BINGO!\".' },
+  { numero: 5, titulo: 'Grite BINGO! 🎉', descricao: 'Ao completar a cartela, clique no botão "BINGO!".' },
 ];
 
 export default function InstrucoesBingo() {
@@ -27,7 +27,8 @@ export default function InstrucoesBingo() {
           >
             ← Voltar
           </Button>
-          <h1 className="title" style={{ color: 'white', marginTop: '20px' }}>Como jogar nosso bingo online?</h1>
+          {/* TÍTULO CORRIGIDO PARA O VERDE PADRÃO */}
+          <h1 className="title" style={{ color: '#1B6F09', marginTop: '20px' }}>Como jogar nosso bingo online?</h1>
           <p style={{ color: '#e2f67e', fontSize: '1.2em' }}>Em poucos passos você pode se divertir e concorrer a prêmios!</p>
         </div>
 
