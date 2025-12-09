@@ -19,6 +19,7 @@ const games_module_1 = require("./games/games.module");
 const prizes_module_1 = require("./prizes/prizes.module");
 const bingo_engine_module_1 = require("./bingo-engine/bingo-engine.module");
 const cards_module_1 = require("./cards/cards.module");
+const reports_module_1 = require("./reports/reports.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -46,6 +47,7 @@ exports.AppModule = AppModule = __decorate([
             prizes_module_1.PrizesModule,
             bingo_engine_module_1.BingoEngineModule,
             cards_module_1.CardsModule,
+            reports_module_1.ReportsModule,
         ],
         controllers: [],
         providers: [],

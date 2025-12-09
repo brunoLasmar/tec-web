@@ -170,8 +170,8 @@ export default function UserLayout({ children }: UserLayoutProps) {
                 Como Jogar
               </a>
               <a 
-                href="/estatisticas" 
-                className={`nav-link ${isActiveRoute('/estatisticas') ? 'active' : ''}`}
+                href="/reports" 
+                className={`nav-link ${isActiveRoute('/reports') ? 'active' : ''}`}
               >
                 Relatórios
               </a>

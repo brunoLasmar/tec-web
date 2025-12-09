@@ -12,6 +12,7 @@ import { GamesModule } from './games/games.module';
 import { PrizesModule } from './prizes/prizes.module';
 import { BingoEngineModule } from './bingo-engine/bingo-engine.module';
 import { CardsModule } from './cards/cards.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { CardsModule } from './cards/cards.module';
     PrizesModule,
     BingoEngineModule,
     CardsModule,
+    ReportsModule,
   ],
   controllers: [],
   providers: [],
